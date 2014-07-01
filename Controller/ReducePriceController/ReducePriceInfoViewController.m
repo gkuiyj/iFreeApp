@@ -1,0 +1,168 @@
+//
+//  ReducePriceViewController.m
+//  iFreeApp
+//
+//  Created by wangkai on 14-5-7.
+//  Copyright (c) 2014年 kaiser.com. All rights reserved.
+//
+
+#import "ReducePriceViewController.h"
+#import "UIDevice+UIDeviceCategory.h"
+#import "AppLog.h"
+
+
+@interface ReducePriceInfoViewController ()
+
+@end
+
+@implementation ReducePriceInfoViewController
+
+- (id)init
+{
+    self = [super init];
+    if (self) {
+        _navigationItemTitleText = @"降价";
+        _categoryId = 0;  //初始化为0，表示查询全部类别
+        if ([UIDevice systemVersionFirstNumber] >= 7) {
+            _titleView = [[UILabel alloc]initWithFrame:CGRectMake(200, 30, 100, 40)];
+            _titleView.text = _navigationItemTitleText;
+            [_titleView setTextColor:[UIColor whiteColor]];
+            _titleView.font = [UIFont fontWithName:@"Arial Rounded MT Bold" size:18];
+            [_titleView setTextAlignment:NSTextAlignmentCenter];
+            [self.navigationItem setTitleView:_titleView];
+            [_titleView release];
+        }
+        else
+        {
+            self.navigationItem.title = _navigationItemTitleText;
+        }
+        //设置导航视图顶部左右按钮的背景图片,样式 以及单击事件
+        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"btn_分类_正常.png"] style:UIBarButtonItemStylePlain target:self action:@selector(rightBarButtonClick:)];
+        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"btn_设置_正常.png"] style:UIBarButtonItemStylePlain target:self action:@selector(leftBarButtonClick:)];
+    }
+    return self;
+}
+
+-(void)setNavigationItemTitleText:(NSString *)navigationItemTitleText
+{
+    if ([UIDevice systemVersionFirstNumber] >= 7)
+    {
+        _titleView.text = navigationItemTitleText;
+    }else
+    {
+        self.navigationItem.title = _navigationItemTitleText;
+    }
+}
+
+-(void)rightBarButtonClick:(id)sender
+{
+    [[ReducePriceViewController shareReducePriceViewController] showAppCategoryViewController];
+}
+
+-(void)leftBarButtonClick:(id)sender
+{
+    [[ReducePriceViewController shareReducePriceViewController] showSettingViewController];
+}
+
+#pragma mark - 视图控制器的函数
+
+- (void)loadView
+{
+    [super loadView];
+    
+    if ([UIDevice systemVersionFirstNumber] < 7)
+    {
+        self.wantsFullScreenLayout = NO;
+    }
+    else
+    {
+        self.edgesForExtendedLayout = UIRectEdgeBottom|UIRectEdgeLeft | UIRectEdgeRight;
+    }
+    
+    _reducePriceInfoView = [[ReducePriceInfoView alloc] initWithFrame:self.view.bounds];
+    _reducePriceInfoView.delegate = self;
+    _reducePriceModel = [[ReducePriceModel alloc] init];
+    _reducePriceInfoView.dataSource = _reducePriceModel;
+    
+    self.view = _reducePriceInfoView;
+    
+    //第一次加载视图时刷新数据
+    [self refreshData];
+}
+
+- (void)refreshData
+{
+    [self showDataLoadingDialog];
+    //刷新数据
+    _reducePriceModel.searchByCategoryId = _categoryId;
+    [_reducePriceModel prepareReducePriceModelData:^(BOOL finished) {
+        if (finished)
+        {
+            [_reducePriceInfoView reloadData];
+            closeModalView();
+        }
+        else
+        {
+            closeModalView();
+            UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:nil message:@"您的网络不给力！" delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil, nil];
+            [alertView show];
+            [NSTimer scheduledTimerWithTimeInterval:2.0f target:self selector:@selector(dismissAlertView:) userInfo:[NSDictionary dictionaryWithObjectsAndKeys:alertView, @"alert",nil] repeats:NO];
+            [alertView release];
+        }
+    }];
+}
+
+- (void)dismissAlertView:(NSTimer *)timer
+{
+    UIAlertView *alert = [[timer userInfo]  objectForKey:@"alert"];
+    [alert dismissWithClickedButtonIndex:0 animated:YES];
+}
+
+//显示应用详情
+-(void)showAppDetailInfoViewController:(NSInteger)rowIndex
+{
+    ReducePriceModel *model =  _reducePriceModel.reducePriceArray[rowIndex];
+    
+    [[ReducePriceViewController shareReducePriceViewController] showAppDetailInfoViewController:model.appId];
+}
+
+- (void)showReducePriceSearchController:(NSString*)searchtext
+{
+    [[ReducePriceViewController shareReducePriceViewController] showReducePriceSearchController:searchtext];
+}
+
+
+#pragma mark - 显示数据正在加载对话框(模态)
+- (void)showDataLoadingDialog
+{
+    _dataLoadingDialog = [[DataLoadingDialog alloc]initWithFrame:CGRectMake(0 , 0, 200, 150)];
+    _dataLoadingDialog.center = CGPointMake(160, 240);
+    _dataLoadingDialog.text = @"正在努力加载中···";
+    _dataLoadingDialog.delegate = self;
+    
+    [_dataLoadingDialog startActivity];
+    
+    showModalView(_dataLoadingDialog,5);
+    
+    [_dataLoadingDialog release];
+}
+
+- (void)DataLoadingDialogDidCancel:(DataLoadingDialog *)dataLoadingDialog
+{
+    closeModalView();
+}
+
+-(void)dealloc
+{
+    [_titleView release];
+    _titleView = nil;
+    [_navigationItemTitleText release];
+    _navigationItemTitleText = nil;
+    [_reducePriceInfoView release];
+    _reducePriceInfoView = nil;
+    [_reducePriceModel release];
+    _reducePriceModel = nil;
+    [super dealloc];
+}
+
+@end
